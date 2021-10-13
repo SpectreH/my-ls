@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -20,6 +21,7 @@ type FileData struct {
 	Size             int64
 	SizeKB           int
 	ModificationTime Date
+	SubFolder        []FileData
 }
 
 type Date struct {
@@ -28,10 +30,29 @@ type Date struct {
 	Time  string
 }
 
-func readCurrentDir() {
-	//var arr []FileData
+type Flags struct {
+	Flag_l bool
+	Flag_R bool
+	Flag_a bool
+	Flag_r bool
+	Flag_t bool
+}
 
-	file, err := os.Open(".")
+var STARTDIR string
+var USERHOMEDIR string
+
+func ReadDir(path string) {
+	// var pathToRead string
+	// var arr []FileData
+	homeDir, _ := os.UserHomeDir()
+
+	if strings.Contains(path, homeDir) {
+		os.Chdir(homeDir)
+	} else {
+		os.Chdir(STARTDIR)
+	}
+
+	file, err := os.Open("/mnt/c/Users/thega/GoProjects/my-ls/test")
 	if err != nil {
 		log.Fatalf("failed opening directory: %s", err)
 	}
@@ -74,6 +95,67 @@ func isHidden(filename string) bool {
 	return false
 }
 
+func CollectFlagsAndPaths(arguments []string) (Flags, []string) {
+	var flagsToUse Flags
+	var paths []string
+
+	inputArgs := arguments[1:]
+
+	for i := 0; i < len(inputArgs); i++ {
+		if inputArgs[i] == "-" {
+			paths = append(paths, inputArgs[i])
+			continue
+		}
+
+		for _, k := range inputArgs[i] {
+			if k == '-' {
+				flagsToUse = DetectFlag(inputArgs[i], flagsToUse)
+				break
+			} else {
+				paths = append(paths, inputArgs[i])
+				break
+			}
+		}
+	}
+
+	return flagsToUse, paths
+}
+
+func DetectFlag(flagToCheck string, flagsToUse Flags) Flags {
+	dashFound := false
+	for _, i := range flagToCheck {
+		if i == 'R' && flagsToUse.Flag_R == false {
+			flagsToUse.Flag_R = true
+		} else if i == 'a' && flagsToUse.Flag_a == false {
+			flagsToUse.Flag_a = true
+		} else if i == 'r' && flagsToUse.Flag_r == false {
+			flagsToUse.Flag_r = true
+		} else if i == 'l' && flagsToUse.Flag_l == false {
+			flagsToUse.Flag_l = true
+		} else if i == 't' && flagsToUse.Flag_t == false {
+			flagsToUse.Flag_t = true
+		} else if i == '-' && !dashFound {
+			dashFound = true
+		} else {
+			fmt.Println("ERROR")
+			os.Exit(0)
+		}
+	}
+
+	return flagsToUse
+}
+
 func main() {
-	readCurrentDir()
+	STARTDIR, _ = os.Getwd()
+	flagsToUse, paths := CollectFlagsAndPaths(os.Args)
+
+	if len(paths) == 0 {
+		ReadDir(".")
+	} else {
+		for i := 0; i < len(paths); i++ {
+			ReadDir(paths[i])
+		}
+	}
+
+	fmt.Println(flagsToUse, paths)
 }
