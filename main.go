@@ -22,6 +22,7 @@ type FileData struct {
 	SizeKB           int
 	ModificationTime Date
 	SubFolder        []FileData
+	Path             string
 }
 
 type Date struct {
@@ -38,21 +39,31 @@ type Flags struct {
 	Flag_t bool
 }
 
+type FolderContent struct {
+	Path     string
+	FileName []string
+}
+
 var STARTDIR string
 var USERHOMEDIR string
 
-func ReadDir(path string) {
-	// var pathToRead string
-	// var arr []FileData
-	homeDir, _ := os.UserHomeDir()
+func ReadDir(path string, content []FolderContent) ([]FileData, []FolderContent) {
+	var fileList []FileData
+	var saveDirPath string
 
-	if strings.Contains(path, homeDir) {
-		os.Chdir(homeDir)
-	} else {
-		os.Chdir(STARTDIR)
-	}
+	// var dot FileData
+	// var dotDot FileData
+	// dot.Name = "."
+	// dot.isHidden = true
+	// dotDot.isHidden = true
+	// dotDot.Name = ".."
+	// fileList = append(fileList, dot)
+	// fileList = append(fileList, dotDot)
 
-	file, err := os.Open("/mnt/c/Users/thega/GoProjects/my-ls/test")
+	os.Chdir(path)
+	saveDirPath = path
+
+	file, err := os.Open(".")
 	if err != nil {
 		log.Fatalf("failed opening directory: %s", err)
 	}
@@ -72,6 +83,7 @@ func ReadDir(path string) {
 		dataToAppend.ModificationTime.Day = fileInfo.ModTime().Day()
 		dataToAppend.ModificationTime.Month = fileInfo.ModTime().UTC().Format("Jan")
 		dataToAppend.ModificationTime.Time = strconv.Itoa(fileInfo.ModTime().Hour()) + ":" + strconv.Itoa(fileInfo.ModTime().Minute())
+		dataToAppend.Path = saveDirPath
 
 		if stat, ok := fileInfo.Sys().(*syscall.Stat_t); ok {
 			UID, _ := user.LookupId(strconv.Itoa(int(stat.Uid)))
@@ -83,8 +95,26 @@ func ReadDir(path string) {
 			dataToAppend.Group = GID.Name
 		}
 
-		fmt.Println(dataToAppend)
+		if dataToAppend.isDirectory {
+			subFolderPath := path + "/" + dataToAppend.Name
+			dataToAppend.SubFolder, content = ReadDir(subFolderPath, content)
+		}
+
+		os.Chdir(saveDirPath)
+
+		fileList = append(fileList, dataToAppend)
 	}
+
+	if len(fileList) != 0 {
+		var contentToAppend FolderContent
+		contentToAppend.Path = fileList[0].Path
+		for i := 0; i < len(fileList); i++ {
+			contentToAppend.FileName = append(contentToAppend.FileName, fileList[i].Name)
+		}
+		content = append(content, contentToAppend)
+	}
+
+	return fileList, content
 }
 
 func isHidden(filename string) bool {
@@ -95,15 +125,26 @@ func isHidden(filename string) bool {
 	return false
 }
 
-func CollectFlagsAndPaths(arguments []string) (Flags, []string) {
+func CollectElements(arguments []string) (Flags, []string, []string) {
 	var flagsToUse Flags
 	var paths []string
+	var files []string
 
 	inputArgs := arguments[1:]
 
 	for i := 0; i < len(inputArgs); i++ {
+		if strings.Contains(inputArgs[i], "/") {
+			paths = append(paths, inputArgs[i])
+			continue
+		}
+
 		if inputArgs[i] == "-" {
 			paths = append(paths, inputArgs[i])
+			continue
+		}
+
+		if !strings.Contains(inputArgs[i], "-") {
+			files = append(files, inputArgs[i])
 			continue
 		}
 
@@ -118,7 +159,7 @@ func CollectFlagsAndPaths(arguments []string) (Flags, []string) {
 		}
 	}
 
-	return flagsToUse, paths
+	return flagsToUse, paths, files
 }
 
 func DetectFlag(flagToCheck string, flagsToUse Flags) Flags {
@@ -146,16 +187,25 @@ func DetectFlag(flagToCheck string, flagsToUse Flags) Flags {
 }
 
 func main() {
+	var contentList []FolderContent
+
 	STARTDIR, _ = os.Getwd()
-	flagsToUse, paths := CollectFlagsAndPaths(os.Args)
+	flagsToUse, paths, files := CollectElements(os.Args)
 
-	if len(paths) == 0 {
-		ReadDir(".")
-	} else {
-		for i := 0; i < len(paths); i++ {
-			ReadDir(paths[i])
+	fileList, contentList := ReadDir(STARTDIR, contentList)
+
+	fmt.Println(flagsToUse, paths, files)
+	fmt.Println(fileList)
+	PrintFolders(contentList)
+}
+
+func PrintFolders(list []FolderContent) {
+	for i := 0; i < len(list); i++ {
+		fmt.Println(list[i].Path + ":")
+		for k := 0; k < len(list[i].FileName); k++ {
+			fmt.Print(list[i].FileName[k])
+			fmt.Print(" ")
 		}
+		fmt.Println("\n")
 	}
-
-	fmt.Println(flagsToUse, paths)
 }
