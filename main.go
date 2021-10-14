@@ -40,15 +40,10 @@ type Flags struct {
 	Flag_t bool
 }
 
-type FolderContent struct {
-	Path      string
-	FilesData []FileData
-}
-
 var STARTDIR string
 var USERHOMEDIR string
 
-func ReadDir(path string, content []FolderContent, skipHidden bool) []FolderContent {
+func ReadDir(path string, content []FileData, skipHidden bool) []FileData {
 	var fileList []FileData
 
 	os.Chdir(path)
@@ -99,21 +94,14 @@ func ReadDir(path string, content []FolderContent, skipHidden bool) []FolderCont
 
 		if dataToAppend.isDirectory {
 			subFolderPath := path + "/" + dataToAppend.Name
-			content = ReadDir(subFolderPath, content, skipHidden)
+			dataToAppend.SubFolder = ReadDir(subFolderPath, content, skipHidden)
 		}
 
 		os.Chdir(saveDirPath)
 		fileList = append(fileList, dataToAppend)
 	}
 
-	if len(fileList) != 0 {
-		var contentToAppend FolderContent
-		contentToAppend.Path = fileList[0].Path
-		contentToAppend.FilesData = fileList
-		content = append(content, contentToAppend)
-	}
-
-	return content
+	return fileList
 }
 
 func CollectData(dataToAppend *FileData, name string, saveDirPath string) {
@@ -151,7 +139,6 @@ func isHidden(filename string) bool {
 	if filename[0:1] == "." {
 		return true
 	}
-
 	return false
 }
 
@@ -217,58 +204,52 @@ func DetectFlag(flagToCheck string, flagsToUse Flags) Flags {
 }
 
 func main() {
-	var contentList []FolderContent
-
-	STARTDIR, _ = os.Getwd()
 	flagsToUse, paths, files := CollectElements(os.Args)
+
+	var contentList []FileData
+	STARTDIR, _ = os.Getwd()
 	contentList = ReadDir(STARTDIR, contentList, flagsToUse.Flag_a)
 
 	_ = paths
 	_ = files
 
-	SortByPath(contentList)
 	if flagsToUse.Flag_t == true {
-		for i := 0; i < len(contentList); i++ {
-			SortByTime(contentList[i].FilesData)
-		}
+		SortByTime(contentList)
 	}
 
 	if flagsToUse.Flag_r == true {
-
+		contentList = ReverseList(contentList)
 	}
 
-	if flagsToUse.Flag_R == true {
-		PrintFolders(contentList, flagsToUse)
-	} else {
-		PrintFiles(contentList[0].FilesData, flagsToUse)
-	}
+	PrintFiles(contentList, contentList[0].Path, flagsToUse)
 }
 
-func PrintFolders(list []FolderContent, flagsToUse Flags) {
-	for i := 0; i < len(list); i++ {
-		fmt.Println(list[i].Path + ":")
-		PrintFiles(list[i].FilesData, flagsToUse)
-		if i != len(list)-1 {
+func PrintFiles(content []FileData, path string, flagsToUse Flags) {
+	fmt.Println(path + ":")
+	for i := 0; i < len(content); i++ {
+		if flagsToUse.Flag_l {
+			if i == 0 {
+				fmt.Println("total", CalculateBlocks(content))
+			}
+			fmt.Println(content[i].Permission, content[i].Hardlinks, content[i].Owner, content[i].Group, content[i].Size, content[i].ModificationTime.Month.UTC().Format("Jan"), content[i].ModificationTime.Day, content[i].ModificationTime.Time, content[i].ModificationTime.Month.Second(), content[i].Name)
+
+		} else {
+			fmt.Print(content[i].Name + " ")
+
+			if i == len(content)-1 {
+				fmt.Println()
+			}
+		}
+
+		if i == len(content)-1 {
 			fmt.Println()
 		}
 	}
-}
 
-func PrintExactFolder() {
-
-}
-
-func PrintFiles(fileNames []FileData, flagsToUse Flags) {
-	for i := 0; i < len(fileNames); i++ {
-		if flagsToUse.Flag_l {
-			if i == 0 {
-				fmt.Println("total", CalculateBlocks(fileNames))
-			}
-			fmt.Println(fileNames[i].Permission, fileNames[i].Hardlinks, fileNames[i].Owner, fileNames[i].Group, fileNames[i].Size, fileNames[i].ModificationTime.Month.UTC().Format("Jan"), fileNames[i].ModificationTime.Day, fileNames[i].ModificationTime.Time, fileNames[i].Name)
-		} else {
-			fmt.Print(fileNames[i].Name + " ")
-			if i == len(fileNames)-1 {
-				fmt.Println()
+	if flagsToUse.Flag_R {
+		for i := 0; i < len(content); i++ {
+			if content[i].isDirectory && content[i].Name != "." && content[i].Name != ".." {
+				PrintFiles(content[i].SubFolder, path+"/"+content[i].Name, flagsToUse)
 			}
 		}
 	}
@@ -280,18 +261,6 @@ func CalculateBlocks(filesData []FileData) int {
 		sum = sum + filesData[i].SizeKB
 	}
 	return sum
-}
-
-func SortByPath(table []FolderContent) {
-	for i := 0; i < len(table); i++ {
-		for j := 0; j < len(table)-i-1; j++ {
-			if table[j].Path > table[j+1].Path {
-				tempVar := table[j]
-				table[j] = table[j+1]
-				table[j+1] = tempVar
-			}
-		}
-	}
 }
 
 func SortWordArr(table []string) {
@@ -323,15 +292,51 @@ func SortByTime(table []FileData) {
 						tempVar := table[j]
 						table[j] = table[j+1]
 						table[j+1] = tempVar
-					} else if table[j].ModificationTime.Month.Minute() < table[j+1].ModificationTime.Month.Minute() {
-						tempVar := table[j]
-						table[j] = table[j+1]
-						table[j+1] = tempVar
+					} else if table[j].ModificationTime.Month.Hour() == table[j+1].ModificationTime.Month.Hour() {
+						if table[j].ModificationTime.Month.Minute() < table[j+1].ModificationTime.Month.Minute() {
+							tempVar := table[j]
+							table[j] = table[j+1]
+							table[j+1] = tempVar
+						} else if table[j].ModificationTime.Month.Minute() == table[j+1].ModificationTime.Month.Minute() {
+							if table[j].ModificationTime.Month.Second() < table[j+1].ModificationTime.Month.Second() {
+								tempVar := table[j]
+								table[j] = table[j+1]
+								table[j+1] = tempVar
+							} else if table[j].ModificationTime.Month.Second() == table[j+1].ModificationTime.Month.Second() {
+								if table[j].ModificationTime.Month.Nanosecond() < table[j+1].ModificationTime.Month.Nanosecond() {
+									tempVar := table[j]
+									table[j] = table[j+1]
+									table[j+1] = tempVar
+								}
+							}
+						}
 					}
 				}
 			}
 		}
 	}
+
+	for i := 0; i < len(table); i++ {
+		if table[i].isDirectory {
+			SortByTime(table[i].SubFolder)
+		}
+	}
+}
+
+func ReverseList(table []FileData) []FileData {
+	var result []FileData
+
+	for i := len(table) - 1; 0 <= i; i-- {
+		result = append(result, table[i])
+	}
+
+	for i := 0; i < len(table); i++ {
+		if result[i].isDirectory {
+			result[i].SubFolder = ReverseList(result[i].SubFolder)
+		}
+	}
+
+	return result
 }
 
 func GetUpperPath(path string) string {
