@@ -75,7 +75,7 @@ func ReadDir(path string, content []structures.FileData, skipHidden bool, RFlag 
 	return fileList
 }
 
-// Gets data from all files to save it in array
+// Gets data from all files to save it into array
 func AppendData(dataToAppend *structures.FileData, name string, saveDirPath string) {
 	fileInfo, err := os.Lstat(name)
 
