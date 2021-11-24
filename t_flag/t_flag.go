@@ -1,12 +1,14 @@
 package t_flag
 
-import "my-ls/structures"
+import (
+	"my-ls/structures"
+)
 
 // Sorts files by time
 func SortByTime(table []structures.FileData) {
 	for i := 0; i < len(table); i++ {
 		for j := 0; j < len(table)-i-1; j++ {
-			if table[j].ModificationTime.Month.Month().String() < table[j+1].ModificationTime.Month.Month().String() {
+			if table[j].ModificationTime.Month.Month().String() > table[j+1].ModificationTime.Month.Month().String() {
 				tempVar := table[j]
 				table[j] = table[j+1]
 				table[j+1] = tempVar
