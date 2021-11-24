@@ -14,6 +14,14 @@ cd my-ls
 go run . [OPTIONS] [FILE|DIR]
 ```
 
+## Examples
+```
+go run . -l == ls -l
+go run . -r == ls -r
+go run . folder/ == ls folder/
+go run . -lraRt == ls -lraRt
+```
+
 ## Available options
 
 * <code>-l</code> - list with long format
