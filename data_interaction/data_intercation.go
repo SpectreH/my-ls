@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Reads a certain directory to collect file names
@@ -98,6 +99,7 @@ func AppendData(dataToAppend *structures.FileData, name string, saveDirPath stri
 	dataToAppend.ModificationTime.Day = fileInfo.ModTime().Day()
 	dataToAppend.ModificationTime.Month = fileInfo.ModTime()
 	dataToAppend.ModificationTime.Time = timeToAppend
+	dataToAppend.ModificationTime.FullTime = fileInfo.ModTime()
 	dataToAppend.Path = saveDirPath
 
 	if stat, ok := fileInfo.Sys().(*syscall.Stat_t); ok {
@@ -178,7 +180,17 @@ func CollectFiles(content []structures.FileData, path string, flagsToUse structu
 				totalCalculated = true
 			}
 
-			var fileName string = content[i].Permission + " " + strconv.Itoa(content[i].Hardlinks) + " " + content[i].Owner + " " + content[i].Group + " " + strconv.Itoa(int(content[i].Size)) + " " + content[i].ModificationTime.Month.UTC().Format("Jan") + " " + strconv.Itoa(content[i].ModificationTime.Day) + " " + content[i].ModificationTime.Time + " " + content[i].Name + "\n"
+			var currentTime time.Time = time.Now()
+			var yearOrTime string
+			diff := currentTime.Sub(content[i].ModificationTime.FullTime)
+
+			if diff.Hours() >= 4380 {
+				yearOrTime = strconv.Itoa(content[i].ModificationTime.FullTime.Year())
+			} else {
+				yearOrTime = content[i].ModificationTime.Time
+			}
+
+			var fileName string = content[i].Permission + " " + strconv.Itoa(content[i].Hardlinks) + " " + content[i].Owner + " " + content[i].Group + " " + strconv.Itoa(int(content[i].Size)) + " " + content[i].ModificationTime.Month.UTC().Format("Jan") + " " + strconv.Itoa(content[i].ModificationTime.Day) + " " + yearOrTime + " " + content[i].Name + "\n"
 
 			if content[i].SymLinkPath != "" {
 				fileName = fileName[:len(fileName)-1]

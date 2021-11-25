@@ -19,9 +19,11 @@ type FileData struct {
 }
 
 type Date struct {
-	Month time.Time
-	Day   int
-	Time  string
+	FullTime time.Time
+	Month    time.Time
+	Day      int
+	Time     string
+	Year     int
 }
 
 type Flags struct {
